@@ -6,6 +6,7 @@
 
 namespace DefStudio\Telegraph\Models;
 
+use DefStudio\Telegraph\Concerns\HandlesConversations;
 use DefStudio\Telegraph\Concerns\HasStorage;
 use DefStudio\Telegraph\Contracts\Storable;
 use DefStudio\Telegraph\Database\Factories\TelegraphChatFactory;
@@ -39,6 +40,7 @@ class TelegraphChat extends Model implements Storable
 {
     use HasFactory;
     use HasStorage;
+    use HandlesConversations;
 
     protected $fillable = [
         'chat_id',

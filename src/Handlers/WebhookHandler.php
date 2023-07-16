@@ -16,6 +16,8 @@ use DefStudio\Telegraph\DTO\PreCheckoutQuery;
 use DefStudio\Telegraph\DTO\SuccessfulPayment;
 use DefStudio\Telegraph\DTO\User;
 use DefStudio\Telegraph\Exceptions\TelegramWebhookException;
+use DefStudio\Telegraph\Handlers\Commands\Command;
+use DefStudio\Telegraph\Handlers\Commands\StubCommand;
 use DefStudio\Telegraph\Keyboard\Keyboard;
 use DefStudio\Telegraph\Models\TelegraphBot;
 use DefStudio\Telegraph\Models\TelegraphChat;
@@ -70,27 +72,32 @@ abstract class WebhookHandler
         $this->$action();
     }
 
-    private function handleCommand(Stringable $text): void
+    private function extractCommand(Stringable $text, array $commands): Command
     {
         $command = (string) $text->after('/')->before(' ')->before('@');
         $parameter = (string) $text->after('@')->after(' ');
 
-        if (!$this->canHandle($command)) {
-            $this->handleUnknownCommand($text);
+        if (array_key_exists($command, $commands)) {
+            /** @var Command $commandInstance */
+            $commandInstance = new $commands[$command]();
+            $commandInstance->parameter = $parameter;
 
-            return;
+            return $commandInstance;
         }
 
-        $this->$command($parameter);
+        $commandInstance = new StubCommand();
+        $commandInstance->command = $command;
+        $commandInstance->parameter = $parameter;
+        $commandInstance->handler = $this;
+
+        return $commandInstance;
     }
 
-    protected function handleUnknownCommand(Stringable $text): void
+    public function handleUnknownCommand(Command $command): void
     {
         if ($this->message?->chat()?->type() === Chat::TYPE_PRIVATE) {
-            $command = (string) $text->after('/')->before(' ')->before('@');
-
             if (config('telegraph.report_unknown_webhook_commands', true)) {
-                report(TelegramWebhookException::invalidCommand($command));
+                report(TelegramWebhookException::invalidCommand($command->command));
             }
 
             $this->chat->html(__('telegraph::errors.invalid_command'))->send();
@@ -108,9 +115,21 @@ abstract class WebhookHandler
         $text = Str::of($this->message?->text() ?? '');
 
         if ($text->startsWith('/')) {
-            $this->handleCommand($text);
+            $commands = config('telegraph.commands');
+            $command = $this->extractCommand($text, $commands);
+        }
+
+        if (
+            (!isset($command) || !$command->stopsConversation)
+            && $this->chat->hasConversation()
+        ) {
+            $this->chat->handleConversation($this->message);
 
             return;
+        }
+
+        if (isset($command)) {
+            $command->handle($this->chat);
         }
 
         if ($this->message?->newChatMembers()->isNotEmpty()) {
@@ -136,7 +155,7 @@ abstract class WebhookHandler
         $this->handleChatMessage($text);
     }
 
-    protected function canHandle(string $action): bool
+    public function canHandle(string $action): bool
     {
         if ($action === 'handle') {
             return false;
@@ -234,6 +253,8 @@ abstract class WebhookHandler
         $this->bot = $bot;
 
         $this->request = $request;
+
+        ray('!!!', $this->request->all());
 
         if ($this->request->has('message')) {
             /* @phpstan-ignore-next-line */
