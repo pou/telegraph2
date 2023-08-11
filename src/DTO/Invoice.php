@@ -24,7 +24,7 @@ class Invoice implements Arrayable
     /**
      * Bot-defined invoice payload, 1-128 bytes. This will not be displayed to the user, use for your internal processes.
      */
-    public string $payload;
+    public string $payload = '';
 
     /**
      * Payment provider token, obtained via @BotFather
@@ -41,7 +41,7 @@ class Invoice implements Arrayable
      *
      * @var array|LabeledPrice[]
      */
-    public array $prices;
+    public array $prices = [];
 
     /**
      * Unique deep-linking parameter. If left empty, forwarded copies of the sent message will have a Pay button, allowing multiple users to pay directly from the forwarded message, using the same invoice. If non-empty, forwarded copies of the sent message will have a URL button with a deep link to the bot (instead of a Pay button), with the value used as the start parameter
