@@ -5,14 +5,19 @@ namespace DefStudio\Telegraph\Concerns;
 use Closure;
 use DefStudio\Telegraph\DTO\Conversations\Step;
 use DefStudio\Telegraph\DTO\Message;
+use DefStudio\Telegraph\Exceptions\StorageException;
 use DefStudio\Telegraph\Handlers\Conversation;
-use Laravel\SerializableClosure\SerializableClosure;
+use DefStudio\Telegraph\Keyboard\Button;
+use DefStudio\Telegraph\Keyboard\Keyboard;
 
 trait HandlesConversations
 {
     use HasStorage;
 
-    public ?Step $step;
+    private const FINALLY_CLOSURE_NAME = '___finally___';
+    private const CLEANUP_CLOSURE_NAME = '___cleanup___';
+
+    public Step $step;
 
     public function getConversationIdentifier(): string
     {
@@ -25,10 +30,17 @@ trait HandlesConversations
         $instance->start();
     }
 
-    public function storeConversation(Conversation $conversation, Closure $next, string $question/*, $additionalParameters = []*/)
+    /**
+     * @param Conversation $conversation
+     * @param Closure|Closure[]|null $next
+     * @param string $question
+     *
+     * @return void
+     *
+     * @throws \DefStudio\Telegraph\Exceptions\StorageException
+     */
+    public function storeStep(Conversation $conversation, mixed $next, string $question): void
     {
-        //        $conversation_cache_time = $instance->getConversationCacheTime();
-        //
         $this->step = new Step();
 
         $this->step->question = $question;
@@ -37,46 +49,36 @@ trait HandlesConversations
         $preparedConversation->chat = null;
         $this->step->conversation = $preparedConversation;
 
-        $preparedNext = clone $next;
-        $preparedNext = $preparedNext->bindTo($preparedConversation, $preparedConversation);
-        $this->step->next = $preparedNext;
+        if (is_array($next)) {
+            $variations = [];
+
+            foreach ($next as $answer => $action) {
+                if (!is_callable($action)) {
+                    continue;
+                }
+                $preparedAction = clone $action;
+                $preparedAction = $preparedAction->bindTo($preparedConversation, $preparedConversation);
+
+                /** @var Closure $preparedAction */
+                $variations[$answer] = $preparedAction;
+            }
+
+            $this->step->variations = $variations;
+        } elseif (is_callable($next)) {
+            $preparedNext = clone $next;
+            $preparedNext = $preparedNext->bindTo($preparedConversation, $preparedConversation);
+            $this->step->next = $preparedNext;
+        }
 
         $this->storage()->set($this->getConversationIdentifier(), $this->step->toArray());
-
-        //            'question' => serialize($question),
-        //            'additionalParameters' => serialize($additionalParameters),
-        //            'time' => microtime(),
-        //        ], $conversation_cache_time ?? $this->config['config']['conversation_cache_time'] ?? 30);
     }
 
-    /**
-     * Touch and update the current conversation.
-     *
-     * @return void
-     */
-    public function touchCurrentConversation()
+    public function extractStep(): void
     {
-        if (!is_null($this->currentConversationData)) {
-            $touched = $this->currentConversationData;
-            $touched['time'] = microtime();
-
-            $this->cache->put($this->message->getConversationIdentifier(), $touched, $this->config['config']['conversation_cache_time'] ?? 30);
-        }
-    }
-
-    /**
-     * Remove a stored conversation array from the cache for a given message.
-     *
-     * @param null|IncomingMessage $message
-     */
-    public function removeStoredConversation($message = null)
-    {
-        $conversation = $this->getStoredConversation($message);
-
-        //        if (isset($conversation['time']) && ($conversation['time'] == $this->currentConversationData['time'])) {
-        //            $this->cache->pull($this->message->getConversationIdentifier());
-        //            $this->cache->pull($this->message->getOriginatedConversationIdentifier());
-        //        }
+        /** @var array{c: string, q: string, n: string, v: string} $stepData */
+        $stepData = $this->storage()->get($this->getConversationIdentifier());
+        $this->step = Step::fromArray($stepData);
+        $this->step->setChat($this);
     }
 
     public function hasConversation(): bool
@@ -85,158 +87,95 @@ trait HandlesConversations
         return !is_null($this->storage()->get($this->getConversationIdentifier()));
     }
 
-    public function handleConversation(Message $message): void
-    {
-        //        $this->loadedConversation = false;
+    /**
+     * @param array<Closure> $variations
+     * @throws StorageException
+     */
+    public function sendVariations(
+        Conversation $conversation,
+        string       $question,
+        array        $variations,
+        ?Closure     $finally = null
+    ): void {
+        $buttons = [];
+        foreach (array_keys($variations) as $title) {
+            $buttons[] = Button::make($title)->action($title);
+        }
 
-        $this->step = Step::fromArray(
-            $this->storage()->get($this->getConversationIdentifier())
-        );
-        $this->step->setChat($this);
+        // todo auto adjust rows, buttons width
+        $keyboard = Keyboard::make()->buttons($buttons);
 
-        // Should we skip the conversation?
-        //        if ($convo['conversation']->skipsConversation($message) === true) {
-        //            return;
-        //        }
+        $response = $this
+            ->message($question)
+            ->keyboard($keyboard)
+            ->send();
 
-        // Or stop it entirely?
-        //        if ($convo['conversation']->stopsConversation($message) === true) {
-        //            $this->cache->pull($message->getConversationIdentifier());
-        //            $this->cache->pull($message->getOriginatedConversationIdentifier());
-        //
-        //            return;
-        //        }
+        $messageId = $response->telegraphMessageId();
+        assert($messageId !== null);
 
-        // todo remove cache
-        //        $this->removeStoredConversation();
-        $this->storage()->forget($this->getConversationIdentifier());
+        $variations[self::CLEANUP_CLOSURE_NAME] = function () use ($messageId) {
+            /** @var Conversation $this */
+            if (isset($this->chat)) {
+                $this->chat->deleteKeyboard($messageId)->send();
+            }
+        };
 
+        if (is_callable($finally)) {
+            $variations[self::FINALLY_CLOSURE_NAME] = $finally;
+        }
 
-        //            $matchingMessages = $this->conversationManager->getMatchingMessages([$message], $this->middleware, $this->getConversationAnswer(), $this->getDriver(), false);
-        //            foreach ($matchingMessages as $matchingMessage) {
-        //                $command = $matchingMessage->getCommand();
-        //                if ($command->shouldStopConversation()) {
-        //                    $this->cache->pull($message->getConversationIdentifier());
-        //                    $this->cache->pull($message->getOriginatedConversationIdentifier());
-        //
-        //                    return;
-        //                } elseif ($command->shouldSkipConversation()) {
-        //                    return;
-        //                }
-        //            }
-
-        // Ongoing conversation - let's find the callback.
-        //            $parameters = [];
-        //            if ($next) {
-        //                $toRepeat = false;
-        //                foreach ($convo['next'] as $callback) {
-        //                    if ($this->matcher->isPatternValid($message, $this->getConversationAnswer(), $callback['pattern'])) {
-        //                        $parameterNames = $this->compileParameterNames($callback['pattern']);
-        //                        $matches = $this->matcher->getMatches();
-
-        //                        if (count($parameterNames) === count($matches)) {
-        //                            $parameters = array_combine($parameterNames, $matches);
-        //                        } else {
-        //                            $parameters = $matches;
-        //                        }
-        //                        $this->matches = $parameters;
-        //                        $next = $this->unserializeClosure($callback['callback']);
-        //                        break;
-        //                    }
-        //                }
-
-        //                if ($next == false) {
-        //no pattern match
-        //answer probably unexpected (some plain text)
-        //let's repeat question
-        //                    $toRepeat = true;
-        //                }
-        //            } else {
-        //                $next = $this->unserializeClosure($convo['next']);
-        //            }
-
-        //            $this->message = $message;
-        //            $this->currentConversationData = $convo;
-
-
-        // todo
-        //        $toRepeat = !$next;
-        //        if ($toRepeat) {
-        //            ray($toRepeat);
-        //            $conversation = $convo['conversation'];
-        //            $conversation->setBot($this);
-        //            $conversation->repeat();
-        //            $this->loadedConversation = true;
-        //        }
-
-        //        $this->callConversation($next, $conversation, $message/*, $parameters*/);
-
-
-        $next = $this->step->next;
-        $next($message);
-
-        // todo
-        //        $this->removeStoredConversation();
-    }
-
-    protected function callConversation(Closure $next, Conversation $conversation, Message $message/*, array $parameters*/)
-    {
-        // todo
-        //        if (!$conversation instanceof ShouldQueue) {
-        //            $conversation->setBot($this);
-        //        }
-
-        /*
-         * Validate askForImages, askForAudio, etc. calls
-         */
-        //        $additionalParameters = Collection::make(unserialize($convo['additionalParameters']));
-        //        if ($additionalParameters->has('__pattern')) {
-        //            if ($this->matcher->isPatternValid($message, $this->getConversationAnswer(), $additionalParameters->get('__pattern'))) {
-        //                $getter = $additionalParameters->get('__getter');
-        //                array_unshift($parameters, $this->getConversationAnswer()->getMessage()->$getter());
-        //                $this->prepareConversationClosure($next, $conversation, $parameters);
-        //            } else {
-        //                if (is_null($additionalParameters->get('__repeat'))) {
-        //                    $conversation->repeat();
-        //                } else {
-        //                    $next = unserialize($additionalParameters->get('__repeat'));
-        //                    array_unshift($parameters, $this->getConversationAnswer());
-        //                    $this->prepareConversationClosure($next, $conversation, $parameters);
-        //                }
-        //            }
-        //        } else {
-        //            array_unshift($parameters, $this->getConversationAnswer());
-        //            $this->prepareConversationClosure($next, $conversation, $parameters);
-        //        }
-
-        // Mark conversation as loaded to avoid triggering the fallback method
-        //        $this->loadedConversation = true;
+        $this->storeStep($conversation, $variations, $question);
     }
 
     /**
-     * @param Closure $next
-     * @param Conversation $conversation
-     * @param array $parameters
+     * @param array{action: string} $data
+     * @throws StorageException
      */
-    protected function prepareConversationClosure($next, Conversation $conversation, array $parameters)
+    public function handleConversationVariation(array $data): void
     {
-        if ($next instanceof SerializableClosure) {
-            $next = $next->getClosure()->bindTo($conversation, $conversation);
-        } elseif ($next instanceof Closure) {
-            $next = $next->bindTo($conversation, $conversation);
+        $this->extractStep();
+        $this->storage()->forget($this->getConversationIdentifier());
+
+        if (isset($this->step->variations[self::CLEANUP_CLOSURE_NAME])) {
+            $this->processNext($this->step->variations[self::CLEANUP_CLOSURE_NAME]);
         }
 
-        $parameters[] = $conversation;
+        if (isset($this->step->variations[$data['action']])) {
+            $this->processNext($this->step->variations[$data['action']]);
+        }
 
-        call_user_func_array($next, array_values($parameters));
+        if (isset($this->step->variations[self::FINALLY_CLOSURE_NAME])) {
+            $this->processNext($this->step->variations[self::FINALLY_CLOSURE_NAME]);
+        }
+    }
 
-        /*
-        // TODO: Needs more work
-        if (class_exists('Illuminate\\Support\\Facades\\App')) {
-            \Illuminate\Support\Facades\App::call($next, $parameters);
+    public function handleConversation(?Message $message): void
+    {
+        $this->extractStep();
+
+        if (!empty($this->step->variations)) {
+            $this->html(__('telegraph::conversations.reminder_to_choose_variant'))->send();
+
+            return;
+        }
+
+        $this->storage()->forget($this->getConversationIdentifier());
+
+        if (isset($this->step->next)) {
+            $this->processNext($this->step->next, $message);
+        }
+    }
+
+    private function processNext(Closure $next, ?Message $data = null): void
+    {
+        $next = $next->bindTo($this->step->conversation, $this->step->conversation);
+
+        assert(is_callable($next));
+
+        if (is_null($data)) {
+            $next();
         } else {
-            call_user_func_array($next, array_values($parameters));
+            $next($data);
         }
-        // */
     }
 }

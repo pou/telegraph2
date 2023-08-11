@@ -11,5 +11,9 @@ abstract class Command
 
     public bool $stopsConversation = false;
 
-    abstract public function handle(TelegraphChat $chat): void;
+    /**
+     * @param TelegraphChat $chat
+     * @return void
+     */
+    abstract public function handle($chat): void;
 }

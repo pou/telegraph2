@@ -7,14 +7,16 @@ use Laravel\SerializableClosure\SerializableClosure;
 
 trait SerializesClosure
 {
-    // todo exception
     public function serializeClosure(Closure $closure): string
     {
-        return serialize(new SerializableClosure($closure, true));
+        return serialize(new SerializableClosure($closure));
     }
 
-    protected function unserializeClosure(string $closure): ?Closure
+    protected function unserializeClosure(string $string): Closure
     {
-        return unserialize($closure)->getClosure();
+        /** @var SerializableClosure $closure */
+        $closure = unserialize($string);
+
+        return $closure->getClosure();
     }
 }

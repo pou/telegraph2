@@ -10,20 +10,18 @@ abstract class Conversation
 {
     public ?TelegraphChat $chat;
 
-    /**
-     * Number of minutes this specific conversation should be cached.
-     * @var int
-     */
-    protected int $cacheTime;
-
-    public function ask(string $question, Closure $next/*, $additionalParameters = []*/): void
+    public function ask(string $question, ?Closure $next): void
     {
+        assert($this->chat !== null);
+
         $this->chat->message($question)->send();
-        $this->chat->storeConversation($this, $next, $question/*, $additionalParameters*/);
+        $this->chat->storeStep($this, $next, $question);
     }
 
     public function repeat(string $question = null): void
     {
+        assert($this->chat !== null);
+
         $step = $this->chat->step;
 
         $question = $question ?? $step->question;
@@ -32,67 +30,44 @@ abstract class Conversation
         $this->ask($question, $next);
     }
 
+    /**
+     * @param array<Closure> $variations
+     */
+    public function variations(
+        string $question,
+        array  $variations,
+        ?Closure $finally = null
+    ): void {
+        assert($this->chat !== null);
+
+        $this->chat->sendVariations($this, $question, $variations, $finally);
+    }
+
+    public function yesOrNo(
+        string  $question,
+        Closure $yes,
+        Closure $no,
+        ?Closure $finally = null,
+        string  $yesTitle = 'Да',
+        string  $noTitle = 'Нет',
+    ): void {
+        $this->variations($question, [
+            $yesTitle => $yes,
+            $noTitle => $no,
+        ], $finally);
+    }
+
     public function say(string $message): void
     {
-        $this->message($message);
-    }
-
-    public function message($message): void
-    {
-        $this->chat->message($message)->send();
-    }
-
-    public function html($message): void
-    {
+        assert($this->chat !== null);
         $this->chat->html($message)->send();
     }
 
     public function invoice(Invoice $invoice, ?Closure $handler = null): void
     {
+        assert($this->chat !== null);
         $this->chat->invoice($invoice, $handler)->send();
     }
 
-    /**
-     * Should the conversation be skipped (temporarily).
-     * @param  IncomingMessage $message
-     * @return bool
-     */
-    public function skipsConversation(IncomingMessage $message)
-    {
-        //
-    }
-
-    /**
-     * Should the conversation be removed and stopped (permanently).
-     * @param  IncomingMessage $message
-     * @return bool
-     */
-    public function stopsConversation(IncomingMessage $message)
-    {
-        //
-    }
-
-    /**
-     * Override default conversation cache time (only for this conversation).
-     * @return mixed
-     */
-    public function getConversationCacheTime()
-    {
-        return $this->cacheTime ?? null;
-    }
-
     abstract public function start(): void;
-
-    /**
-     * @return array
-     */
-    public function __sleep()
-    {
-        $properties = get_object_vars($this);
-        if (!$this instanceof ShouldQueue) {
-            unset($properties['bot']);
-        }
-
-        return array_keys($properties);
-    }
 }

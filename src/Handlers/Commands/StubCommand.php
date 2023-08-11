@@ -9,7 +9,11 @@ class StubCommand extends Command
 {
     public WebhookHandler $handler;
 
-    public function handle(TelegraphChat $chat): void
+    /**
+     * @param TelegraphChat $chat
+     * @return void
+     */
+    public function handle($chat): void
     {
         if (!$this->handler->canHandle($this->command)) {
             $this->handler->handleUnknownCommand($this);

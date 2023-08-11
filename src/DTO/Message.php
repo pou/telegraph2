@@ -75,7 +75,7 @@ class Message implements Arrayable
      *     contact?: array<string, mixed>,
      *     new_chat_members?: array<string, mixed>,
      *     left_chat_member?: array<string, mixed>,
-     *     web_app_data?: string,
+     *     web_app_data?: array<string, mixed>,
      *     successful_payment?: array<string, mixed>,
      *  } $data
      */
@@ -115,7 +115,7 @@ class Message implements Arrayable
             $message->chat = Chat::fromArray($data['chat']);
         }
 
-        if (isset($data['reply_markup']) && isset($data['reply_markup']['inline_keyboard'])) {
+        if (isset($data['reply_markup']['inline_keyboard'])) {
             /* @phpstan-ignore-next-line */
             $message->keyboard = Keyboard::fromArray($data['reply_markup']['inline_keyboard']);
         } else {
@@ -150,7 +150,6 @@ class Message implements Arrayable
             $message->location = Location::fromArray($data['location']);
         }
 
-
         if (isset($data['contact'])) {
             /* @phpstan-ignore-next-line */
             $message->contact = Contact::fromArray($data['contact']);
@@ -172,7 +171,7 @@ class Message implements Arrayable
         if (isset($data['web_app_data']['data'])) {
             $webAppData = json_decode($data['web_app_data']['data'], true);
 
-            if(!$webAppData) {
+            if (!$webAppData) {
                 $webAppData = $data['web_app_data']['data'];
             }
 

@@ -59,8 +59,16 @@ abstract class WebhookHandler
             Log::debug('Telegraph webhook callback', $this->data->toArray());
         }
 
+        if ($this->chat->hasConversation()) {
+            /** @var array{action:string} $variation */
+            $variation = $this->data->toArray();
+            $this->chat->handleConversationVariation($variation);
+
+            return;
+        }
+
         /** @var string $action */
-        $action = $this->callbackQuery?->data()->get('action') ?? '';
+        $action = $this->data->get('action') ?? '';
 
         if (!$this->canHandle($action)) {
             report(TelegramWebhookException::invalidAction($action));
@@ -72,6 +80,9 @@ abstract class WebhookHandler
         $this->$action();
     }
 
+    /**
+     * @param array<string> $commands
+     */
     private function extractCommand(Stringable $text, array $commands): Command
     {
         $command = (string) $text->after('/')->before(' ')->before('@');
@@ -115,6 +126,7 @@ abstract class WebhookHandler
         $text = Str::of($this->message?->text() ?? '');
 
         if ($text->startsWith('/')) {
+            /** @var array<string> $commands */
             $commands = config('telegraph.commands');
             $command = $this->extractCommand($text, $commands);
         }
@@ -253,8 +265,6 @@ abstract class WebhookHandler
         $this->bot = $bot;
 
         $this->request = $request;
-
-        ray('!!!', $this->request->all());
 
         if ($this->request->has('message')) {
             /* @phpstan-ignore-next-line */
