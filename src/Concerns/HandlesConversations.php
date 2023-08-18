@@ -115,7 +115,11 @@ trait HandlesConversations
 
         $variations[self::CLEANUP_CLOSURE_NAME] = function () use ($messageId) {
             /** @var Conversation $this */
-            if (isset($this->chat)) {
+            if (isset($this->chat) && $this->chat->step->deleteQuestion) {
+                $this->chat->deleteMessage($messageId)->send();
+            }
+
+            if (isset($this->chat) && $this->chat->step->deleteQuestionButtons) {
                 $this->chat->deleteKeyboard($messageId)->send();
             }
         };

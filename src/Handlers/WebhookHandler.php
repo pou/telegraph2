@@ -224,7 +224,7 @@ abstract class WebhookHandler
         // .. do nothing
     }
 
-    protected function handleSuccessfulPayment(SuccessfulPayment $payment): void
+    protected function handleSuccessfulPayment(SuccessfulPayment $data): void
     {
         //
     }

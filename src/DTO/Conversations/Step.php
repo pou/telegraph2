@@ -18,6 +18,9 @@ final class Step implements Arrayable
     /** @var array|Closure[] */
     public array $variations = [];
 
+    public bool $deleteQuestion = true;
+    public bool $deleteQuestionButtons = false;
+
     public function setChat(TelegraphChat $chat): void
     {
         assert($this->conversation !== null);
