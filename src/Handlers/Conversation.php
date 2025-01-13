@@ -18,7 +18,7 @@ abstract class Conversation
         $this->chat->storeStep($this, $next, $question);
     }
 
-    public function repeat(string $question = null): void
+    public function repeat(?string $question = null): void
     {
         assert($this->chat !== null);
 

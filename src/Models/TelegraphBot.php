@@ -68,7 +68,7 @@ class TelegraphBot extends Model implements Storable
         return 'token';
     }
 
-    public static function fromId(int $id = null): TelegraphBot
+    public static function fromId(?int $id = null): TelegraphBot
     {
         if (empty($id)) {
             /** @noinspection PhpIncompatibleReturnTypeInspection */
@@ -160,7 +160,7 @@ class TelegraphBot extends Model implements Storable
         return TelegraphFacade::bot($this)->getFileInfo($fileId);
     }
 
-    public function store(Downloadable|string $attachment, string $path, string $filename = null): string
+    public function store(Downloadable|string $attachment, string $path, ?string $filename = null): string
     {
         return TelegraphFacade::bot($this)->store($attachment, $path, $filename);
     }

@@ -14,7 +14,7 @@ class Animation implements Arrayable, Downloadable
     private ?int $duration = null;
     private ?int $filesize = null;
 
-    private ?string $filename = null;
+    private ??string $filename = null;
     private ?string $mimeType = null;
 
     private ?Photo $thumbnail = null;

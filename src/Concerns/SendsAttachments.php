@@ -89,7 +89,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function voice(string $path, string $filename = null): self
+    public function voice(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -109,7 +109,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function animation(string $path, string $filename = null): self
+    public function animation(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -123,7 +123,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function video(string $path, string $filename = null): self
+    public function video(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -137,7 +137,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function audio(string $path, string $filename = null): self
+    public function audio(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -151,7 +151,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function document(string $path, string $filename = null): self
+    public function document(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -206,7 +206,7 @@ trait SendsAttachments
         return $telegraph;
     }
 
-    public function photo(string $path, string $filename = null): self
+    public function photo(string $path, ?string $filename = null): self
     {
         $telegraph = clone $this;
 
@@ -259,7 +259,7 @@ trait SendsAttachments
         return ceil($sizeInKBytes * 100) / 100;
     }
 
-    public function dice(string $emoji = null): self
+    public function dice(?string $emoji = null): self
     {
         $telegraph = clone $this;
 

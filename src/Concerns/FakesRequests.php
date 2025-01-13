@@ -33,7 +33,7 @@ trait FakesRequests
         self::$sentMessages = [];
     }
 
-    protected function dispatchRequestToTelegram(string $queue = null): PendingDispatch
+    protected function dispatchRequestToTelegram(?string $queue = null): PendingDispatch
     {
         self::$sentMessages[] = $this->messageToArray();
 
@@ -244,7 +244,7 @@ trait FakesRequests
         return new Response(new $messageClass($response));
     }
 
-    public function store(Downloadable|string $downloadable, string $path, string $filename = null): string
+    public function store(Downloadable|string $downloadable, string $path, ?string $filename = null): string
     {
         $fileId = is_string($downloadable) ? $downloadable : $downloadable->id();
 

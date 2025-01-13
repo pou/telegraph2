@@ -188,7 +188,7 @@ class TelegraphChat extends Model implements Storable
         return TelegraphFacade::chat($this)->chatAction($action);
     }
 
-    public function document(string $path, string $filename = null): Telegraph
+    public function document(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->document($path, $filename);
     }
@@ -198,27 +198,27 @@ class TelegraphChat extends Model implements Storable
         return TelegraphFacade::chat($this)->location(latitude: $latitude, longitude: $longitude);
     }
 
-    public function photo(string $path, string $filename = null): Telegraph
+    public function photo(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->photo($path, $filename);
     }
 
-    public function animation(string $path, string $filename = null): Telegraph
+    public function animation(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->animation($path, $filename);
     }
 
-    public function video(string $path, string $filename = null): Telegraph
+    public function video(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->video($path, $filename);
     }
 
-    public function audio(string $path, string $filename = null): Telegraph
+    public function audio(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->audio($path, $filename);
     }
 
-    public function voice(string $path, string $filename = null): Telegraph
+    public function voice(string $path, ?string $filename = null): Telegraph
     {
         return TelegraphFacade::chat($this)->voice($path, $filename);
     }
@@ -322,7 +322,7 @@ class TelegraphChat extends Model implements Storable
         return TelegraphFacade::chat($this)->quiz($question);
     }
 
-    public function dice(string $emoji = null): Telegraph
+    public function dice(?string $emoji = null): Telegraph
     {
         return TelegraphFacade::chat($this)->dice($emoji);
     }
